@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이 월세, 괜찮은 가격일까?</title>
+<style>
+  :root {
+    --bg: #ffffff; --panel: #f4f6f9; --line: #e3e7ee; --text: #1f2430; --sub: #6b7280;
+    --red: #d62728; --blue: #2f6db5; --band: #9ecae1;
+    --ok-bg: #e8f5ec; --ok-fg: #1e6b3a; --info-bg: #e7f0fb; --info-fg: #1f4f8f;
+    --warn-bg: #fff6dc; --warn-fg: #8a5a00; --bad-bg: #fde8e8; --bad-fg: #9b1c1c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; font-size: 15px; }
+  .wrap { display: flex; min-height: 100vh; }
+  aside { width: 300px; flex-shrink: 0; background: var(--panel); padding: 28px 22px; border-right: 1px solid var(--line); }
+  main { flex: 1; padding: 32px 40px 60px; max-width: 1100px; }
+  h1 { font-size: 30px; margin: 0 0 6px; }
+  h2 { font-size: 22px; margin: 26px 0 14px; }
+  h3 { font-size: 17px; margin: 0 0 12px; }
+  .caption { color: var(--sub); font-size: 13px; }
+  label { display: block; font-size: 13px; color: #444; margin: 14px 0 5px; }
+  select, input[type=number], input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid #ccd3dd; border-radius: 6px; font-size: 14px; background: #fff; }
+  .radio { display: flex; gap: 16px; font-size: 14px; }
+  .radio label { margin: 0; font-size: 14px; color: var(--text); display: flex; align-items: center; gap: 5px; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 6px 0 14px; }
+  .card .k { font-size: 13px; color: var(--sub); }
+  .card .v { font-size: 30px; font-weight: 600; margin-top: 4px; white-space: nowrap; }
+  .verdict { padding: 14px 16px; border-radius: 8px; line-height: 1.6; }
+  .ok { background: var(--ok-bg); color: var(--ok-fg); }
+  .info { background: var(--info-bg); color: var(--info-fg); }
+  .warn { background: var(--warn-bg); color: var(--warn-fg); }
+  .bad { background: var(--bad-bg); color: var(--bad-fg); }
+  .range { position: relative; height: 58px; margin: 18px 6px 4px; }
+  .range .track { position: absolute; top: 14px; height: 2px; background: #c9ced6; }
+  .range .band { position: absolute; top: 8px; height: 14px; background: var(--band); border-radius: 3px; }
+  .range .dot { position: absolute; top: 7px; width: 16px; height: 16px; border-radius: 50%; transform: translateX(-50%); border: 2px solid #fff; }
+  .range .tick { position: absolute; top: 30px; font-size: 12px; color: var(--sub); transform: translateX(-50%); white-space: nowrap; }
+  .legend { font-size: 12px; color: var(--sub); }
+  .legend span { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 4px 0 10px; vertical-align: -1px; }
+  .cols { display: grid; grid-template-columns: 1.1fr 1fr; gap: 32px; }
+  .bars .row { display: grid; grid-template-columns: 110px 1fr 70px; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+  .bars .axis { position: relative; height: 18px; }
+  .bars .zero { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: #999; }
+  .bars .bar { position: absolute; top: 2px; height: 14px; }
+  .bars .num { text-align: right; color: #333; }
+  ul.top { padding-left: 18px; line-height: 1.9; margin: 6px 0 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 7px 9px; border-bottom: 1px solid var(--line); text-align: right; }
+  th { background: var(--panel); color: #555; font-weight: 500; }
+  td:first-child, th:first-child { text-align: left; }
+  details { margin-top: 26px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+  details li { line-height: 1.8; }
+  .muted { color: var(--sub); font-size: 13px; }
+  a { color: var(--blue); }
+  #loading { padding: 80px 40px; font-size: 16px; color: var(--sub); }
+  @media (max-width: 900px) {
+    .wrap { flex-direction: column; } aside { width: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+    main { padding: 24px 18px; } .cols, .cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="loading">데이터 불러오는 중... (처음 한 번 몇 초 걸림)</div>
+<div class="wrap" id="app" style="display:none">
+  <aside>
+    <h3>매물 정보 입력</h3>
+    <label>주택유형</label>
+    <div class="radio">
+      <label><input type="radio" name="type" value="0" checked> 아파트</label>
+      <label><input type="radio" name="type" value="1"> 연립다세대</label>
+    </div>
+    <label for="gu">구</label><select id="gu"></select>
+    <label for="dong">동</label><select id="dong"></select>
+    <label for="q">건물 찾기 (이름, 도로명)</label><input type="text" id="q" placeholder="예: 자이, 논현로">
+    <label for="bld">건물</label><select id="bld"></select>
+    <label for="area">전용면적 (㎡)</label><input type="number" id="area" step="0.5" min="5" max="350">
+    <label for="floor">층</label><input type="number" id="floor" step="1" min="-2" max="70">
+    <label for="months">계약기간 (개월)</label>
+    <select id="months"><option>6</option><option>12</option><option selected>24</option><option>36</option><option>48</option></select>
+    <label for="month">계약하는 달</label><select id="month"></select>
+    <label for="dep">보증금 (만원)</label><input type="number" id="dep" step="100" min="0">
+    <label for="rent">월세 (만원)</label><input type="number" id="rent" step="1" min="1">
+  </aside>
+  <main>
+    <h1>이 월세, 괜찮은 가격일까?</h1>
+    <div class="caption">2024년 서울 아파트, 연립다세대 월세 실거래 12만 건으로 만든 적정 월세 확인 (데이터마이닝 3조 프로젝트 v2, streamlit 화면과 같은 모델)</div>
+    <h2 id="title"></h2>
+    <div class="cards">
+      <div class="card"><div class="k">이 매물 월부담액</div><div class="v" id="mine"></div></div>
+      <div class="card"><div class="k">모델 적정가</div><div class="v" id="pred"></div></div>
+      <div class="card"><div class="k">적정 범위 (80%)</div><div class="v" id="band"></div></div>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <div class="range" id="range"></div>
+    <div class="legend">파란 띠 = 적정 범위 80%, 회색 선 = 98% 범위<span style="background:var(--blue)"></span>모델 적정가<span style="background:var(--red)"></span>이 매물</div>
+
+    <div class="cols">
+      <section>
+        <h2>왜 이 가격이 나왔나 (SHAP)</h2>
+        <div id="shapText" class="muted"></div>
+        <div class="bars" id="bars"></div>
+        <p style="margin:18px 0 0"><b>영향이 큰 항목</b></p>
+        <ul class="top" id="top"></ul>
+      </section>
+      <section>
+        <h2>보증금 바꿔보기</h2>
+        <div id="rateText" class="muted"></div>
+        <table id="eq"></table>
+        <p class="muted" id="mapLink"></p>
+      </section>
+    </div>
+
+    <h2>같은 건물 2024년 실거래</h2>
+    <div id="tradeText" class="muted"></div>
+    <table id="trades"></table>
+
+    <details>
+      <summary>이 화면은 어떻게 계산하나</summary>
+      <ul id="howto"></ul>
+    </details>
+  </main>
+</div>
+
+<script id="blob-meta" type="application/octet-stream">__META__</script>
+<script id="blob-num" type="application/octet-stream">__NUM__</script>
+<script>
+// ---- core start
+function extendPath(p, depth, zero, one, feat) {
+  p[depth] = { f: feat, z: zero, o: one, w: depth === 0 ? 1 : 0 };
+  for (let i = depth - 1; i >= 0; i--) {
+    p[i + 1].w += one * p[i].w * (i + 1) / (depth + 1);
+    p[i].w = zero * p[i].w * (depth - i) / (depth + 1);
+  }
+}
+function unwindPath(p, depth, idx) {
+  const one = p[idx].o, zero = p[idx].z;
+  let next = p[depth].w;
+  for (let i = depth - 1; i >= 0; i--) {
+    if (one !== 0) {
+      const tmp = p[i].w;
+      p[i].w = next * (depth + 1) / ((i + 1) * one);
+      next = tmp - p[i].w * zero * (depth - i) / (depth + 1);
+    } else {
+      p[i].w = (p[i].w * (depth + 1)) / (zero * (depth - i));
+    }
+  }
+  for (let i = idx; i < depth; i++) { p[i].f = p[i + 1].f; p[i].z = p[i + 1].z; p[i].o = p[i + 1].o; }
+}
+function unwoundSum(p, depth, idx) {
+  const one = p[idx].o, zero = p[idx].z;
+  let next = p[depth].w, total = 0;
+  for (let i = depth - 1; i >= 0; i--) {
+    if (one !== 0) {
+      const tmp = next * (depth + 1) / ((i + 1) * one);
+      total += tmp;
+      next = p[i].w - tmp * zero * ((depth - i) / (depth + 1));
+    } else if (zero !== 0) {
+      total += (p[i].w / zero) / ((depth - i) / (depth + 1));
+    }
+  }
+  return total;
+}
+// TreeSHAP (Lundberg et al. 2018), XGBoost pred_contribs와 같은 값
+function shapRecurse(M, x, phi, node, depth, parent, pz, po, pf) {
+  const p = new Array(depth + 1);
+  for (let i = 0; i < depth; i++) p[i] = { f: parent[i].f, z: parent[i].z, o: parent[i].o, w: parent[i].w };
+  extendPath(p, depth, pz, po, pf);
+  const f = M.F[node];
+  if (f < 0) {
+    for (let i = 1; i <= depth; i++) {
+      phi[p[i].f] += unwoundSum(p, depth, i) * (p[i].o - p[i].z) * M.V[node];
+    }
+    return;
+  }
+  const left = node + 1, right = M.R[node];
+  const hot = x[f] < M.V[node] ? left : right;
+  const cold = hot === left ? right : left;
+  const hz = M.C[hot] / M.C[node], cz = M.C[cold] / M.C[node];
+  let iz = 1, io = 1, d = depth, k = 0;
+  for (; k <= depth; k++) if (p[k].f === f) break;
+  if (k !== depth + 1) { iz = p[k].z; io = p[k].o; unwindPath(p, d, k); d -= 1; }
+  shapRecurse(M, x, phi, hot, d + 1, p, hz * iz, io, f);
+  shapRecurse(M, x, phi, cold, d + 1, p, cz * iz, 0, f);
+}
+function explain(M, xRaw) {
+  const x = xRaw.map(v => Math.fround(v));   // XGBoost는 float32로 비교
+  let pred = M.base;
+  for (let t = 0; t < M.roots.length; t++) {
+    let i = M.roots[t];
+    while (M.F[i] >= 0) i = x[M.F[i]] < M.V[i] ? i + 1 : M.R[i];
+    pred += M.V[i];
+  }
+  const phi = new Float64Array(M.nFeat);
+  for (let t = 0; t < M.roots.length; t++) shapRecurse(M, x, phi, M.roots[t], 0, [], 1, 1, -1);
+  return { pred, phi: Array.from(phi), bias: M.bias };
+}
+// ---- core end
+
+async function unpack(id) {
+  const b64 = document.getElementById(id).textContent.trim();
+  const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const stream = new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return await new Response(stream).arrayBuffer();
+}
+const TYPES = ['아파트', '연립다세대'];
+const fmt = (v, d = 0) => v.toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const $ = id => document.getElementById(id);
+let META, A, MODELS, B, T;
+
+function arr(name) {
+  const s = META.arrays[name];
+  const C = { f4: Float32Array, i4: Int32Array, i2: Int16Array, u2: Uint16Array, i1: Int8Array, u1: Uint8Array }[s.dtype];
+  return new C(A, s.offset, s.length);
+}
+
+async function init() {
+  META = JSON.parse(new TextDecoder().decode(await unpack('blob-meta')));
+  A = await unpack('blob-num');
+  MODELS = TYPES.map((t, k) => ({
+    F: arr(`m${k}_F`), V: arr(`m${k}_V`), R: arr(`m${k}_R`), C: arr(`m${k}_C`), roots: arr(`m${k}_roots`),
+    base: META.models[k].base, bias: META.models[k].bias, nFeat: META.models[k].features.length, features: META.models[k].features,
+  }));
+  B = { type: arr('b_type'), gu: arr('b_gu'), dong: arr('b_dong'), bid: arr('b_bid'), ntx: arr('b_ntx'), year: arr('b_year'),
+        lat: arr('b_lat'), lon: arr('b_lon'), feat: {} };
+  for (const c of META.b_feat_cols) B.feat[c] = arr('bf_' + c);
+  T = { bid: arr('t_bid'), type: arr('t_type'), area: arr('t_area'), floor: arr('t_floor'), dep: arr('t_dep'),
+        rent: arr('t_rent'), month: arr('t_month'), months: arr('t_months') };
+  for (let m = 1; m <= 12; m++) $('month').insertAdjacentHTML('beforeend', `<option>${m}</option>`);
+  document.querySelectorAll('input[name=type]').forEach(r => r.addEventListener('change', fillGu));
+  $('gu').addEventListener('change', fillDong);
+  $('dong').addEventListener('change', fillBld);
+  $('q').addEventListener('input', fillBld);
+  $('bld').addEventListener('change', setDefaults);
+  ['area', 'floor', 'months', 'month', 'dep', 'rent'].forEach(id => $(id).addEventListener('input', render));
+  $('loading').style.display = 'none';
+  $('app').style.display = 'flex';
+  fillGu();
+}
+const curType = () => +document.querySelector('input[name=type]:checked').value;
+
+function fillGu() {
+  const t = curType(), gus = new Set();
+  for (let i = 0; i < B.type.length; i++) if (B.type[i] === t) gus.add(B.gu[i]);
+  const list = [...gus].sort((a, b) => META.gu[a].localeCompare(META.gu[b], 'ko'));
+  $('gu').innerHTML = list.map(g => `<option value="${g}">${META.gu[g]}</option>`).join('');
+  fillDong();
+}
+function fillDong() {
+  const t = curType(), g = +$('gu').value, ds = new Set();
+  for (let i = 0; i < B.type.length; i++) if (B.type[i] === t && B.gu[i] === g) ds.add(B.dong[i]);
+  const list = [...ds].sort((a, b) => META.dong[a].localeCompare(META.dong[b], 'ko'));
+  $('dong').innerHTML = list.map(d => `<option value="${d}">${META.dong[d]}</option>`).join('');
+  $('q').value = '';
+  fillBld();
+}
+function bldLabel(i) {
+  return `${META.name[i] || '(이름 없음)'}  |  ${META.road[i] || '-'}  (${META.jibun[i]})`;
+}
+function fillBld() {
+  const t = curType(), g = +$('gu').value, d = +$('dong').value, q = $('q').value.trim();
+  const list = [];
+  for (let i = 0; i < B.type.length; i++) {
+    if (B.type[i] !== t || B.gu[i] !== g || B.dong[i] !== d) continue;
+    const lab = bldLabel(i);
+    if (!q || lab.includes(q)) list.push([lab, i]);
+  }
+  list.sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+  $('bld').innerHTML = list.map(([lab, i]) => `<option value="${i}">${lab}</option>`).join('');
+  if (list.length) setDefaults();
+}
+function tradesOf(i) {
+  const out = [], t = B.type[i], b = B.bid[i];
+  for (let k = 0; k < T.bid.length; k++) if (T.bid[k] === b && T.type[k] === t) out.push(k);
+  return out;
+}
+function setDefaults() {
+  const i = +$('bld').value, ks = tradesOf(i);
+  let last = ks[0];
+  for (const k of ks) if (T.month[k] >= T.month[last]) last = k;
+  $('area').value = T.area[last].toFixed(2);
+  $('floor').value = T.floor[last];
+  $('month').value = T.month[last];
+  $('months').value = 24;
+  $('dep').value = T.dep[last];
+  $('rent').value = T.rent[last];
+  render();
+}
+
+function render() {
+  const i = +$('bld').value; if (isNaN(i)) return;
+  const t = B.type[i], M = MODELS[t], r = META.rate[TYPES[t]];
+  const area = +$('area').value, floor = +$('floor').value, months = +$('months').value, month = +$('month').value;
+  const dep = +$('dep').value || 0, rent = +$('rent').value || 0;
+  const user = { '전용면적(㎡)': area, '층': floor, '계약개월수': months, '계약월': month, '건축년도': B.year[i] };
+  const x = M.features.map(c => (c in user ? user[c] : B.feat[c][i]));
+  const res = explain(M, x);
+  const pred = Math.max(res.pred, 1);
+  const ntx = B.ntx[i];
+  const bins = META.bins; let bi = 0;
+  for (let k = 0; k < bins.length; k++) if (ntx >= bins[k]) bi = k;
+  const lab = META.bin_labels[bi];
+  const pct = META.calib[TYPES[t]][lab];
+  const lo = pred * pct[9], hi = pred * pct[89];
+  const mine = dep * r / 12 + rent;
+  const ratio = mine / pred;
+  let pos;
+  if (ratio <= pct[0]) pos = 1; else if (ratio >= pct[98]) pos = 99;
+  else { let k = 0; while (pct[k + 1] < ratio) k++; const gap = pct[k + 1] - pct[k]; pos = k + 1 + (gap > 0 ? (ratio - pct[k]) / gap : 0); }
+
+  const gu = META.gu[B.gu[i]], dong = META.dong[B.dong[i]];
+  $('title').textContent = `${META.name[i] || '(이름 없음)'}  |  ${gu} ${dong}`;
+  $('mine').textContent = `${fmt(mine)}만원`;
+  $('pred').textContent = `${fmt(pred)}만원`;
+  $('band').textContent = `${fmt(lo)} ~ ${fmt(hi)}만원`;
+
+  let cls, verdict, note;
+  if (pos < 10) { cls = 'warn'; verdict = '시세보다 많이 낮음'; note = '너무 싸면 이유가 있을 수 있음. 등기부등본(근저당, 압류), 건축물대장(위반건축물) 꼭 확인하기'; }
+  else if (pos < 35) { cls = 'ok'; verdict = '저렴한 편'; note = '비슷한 조건 거래보다 낮은 편'; }
+  else if (pos <= 65) { cls = 'ok'; verdict = '적정 수준'; note = '비슷한 조건 거래의 가운데쯤'; }
+  else if (pos <= 90) { cls = 'info'; verdict = '비싼 편'; note = "아래 '보증금 바꿔보기'랑 같은 건물 실거래를 근거로 조정해볼 만함"; }
+  else { cls = 'bad'; verdict = '시세보다 많이 높음'; note = '비슷한 조건 거래 10건 중 9건보다 비쌈. 같은 건물 실거래부터 확인하기'; }
+  $('verdict').className = 'verdict ' + cls;
+  $('verdict').innerHTML = `<b>${verdict}</b> : 비슷한 조건 거래 100건을 싼 것부터 줄 세우면 대략 <b>${fmt(pos)}번째</b><br>${note}`;
+
+  // 범위 그림
+  const vmin = Math.min(pred * pct[0], mine) * 0.9, vmax = Math.max(pred * pct[98], mine) * 1.05;
+  const X = v => `${((v - vmin) / (vmax - vmin)) * 100}%`;
+  let h = `<div class="track" style="left:${X(pred * pct[0])};width:calc(${X(pred * pct[98])} - ${X(pred * pct[0])})"></div>`;
+  h += `<div class="band" style="left:${X(lo)};width:calc(${X(hi)} - ${X(lo)})"></div>`;
+  h += `<div class="dot" style="left:${X(pred)};background:var(--blue)"></div><div class="dot" style="left:${X(mine)};background:var(--red)"></div>`;
+  const step = niceStep((vmax - vmin) / 6);
+  for (let v = Math.ceil(vmin / step) * step; v <= vmax; v += step) h += `<div class="tick" style="left:${X(v)}">${fmt(v)}</div>`;
+  $('range').innerHTML = h;
+
+  // SHAP
+  const groups = {};
+  M.features.forEach((c, k) => { const g = META.groups[c]; groups[g] = (groups[g] || 0) + res.phi[k]; });
+  const gl = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+  const gmax = Math.max(...gl.map(g => Math.abs(g[1])), 1);
+  $('shapText').innerHTML = `서울 ${TYPES[t]} 평균 수준 <b>${fmt(res.bias)}만원</b>에서 시작해서 아래 요인들을 더하고 빼면 <b>${fmt(pred)}만원</b>`;
+  $('bars').innerHTML = gl.map(([g, v]) => {
+    const w = Math.abs(v) / gmax * 50;
+    const style = v >= 0 ? `left:50%;width:${w}%;background:var(--red)` : `left:${50 - w}%;width:${w}%;background:var(--blue)`;
+    return `<div class="row"><div>${g}</div><div class="axis"><div class="zero"></div><div class="bar" style="${style}"></div></div><div class="num">${v >= 0 ? '+' : ''}${fmt(v, 1)}만원</div></div>`;
+  }).join('');
+  const show = (c, v) => {
+    if (c === '자치구코드') return gu; if (c === '법정동코드') return dong;
+    if (c === '전용면적(㎡)') return `${v.toFixed(1)}㎡`; if (c === '층') return `${v}층`;
+    if (c === '건축년도') return `${v}년`; if (c === '계약개월수') return `${v}개월`; if (c === '계약월') return `${v}월`;
+    if (c.includes('비율') || c.includes('인구비')) return `${(v * 100).toFixed(1)}%`;
+    if (c.includes('거래수')) return `${fmt(v)}건`;
+    return `${v}개`;
+  };
+  const order = M.features.map((c, k) => [c, res.phi[k], x[k]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 6);
+  $('top').innerHTML = order.map(([c, v, xv]) => `<li>${META.names[c]} (${show(c, xv)}) : ${v >= 0 ? '+' : ''}${fmt(v, 1)}만원</li>`).join('');
+
+  // 보증금 바꿔보기
+  $('rateText').innerHTML = `2024년 실거래 기준 보증금 1,000만원 = 월세 약 <b>${fmt(1000 * r / 12, 1)}만원</b> (전환율 ${(r * 100).toFixed(2)}%)`;
+  const deps = [...new Set([0, 500, 1000, 2000, 3000, 5000, 10000, 20000, 30000, 50000, dep])].sort((a, b) => a - b).filter(d => d * r / 12 < Math.min(mine, pred));
+  $('eq').innerHTML = '<tr><th>보증금 (만원)</th><th>이 매물과 같은 부담의 월세</th><th>적정가 기준 월세</th></tr>' +
+    deps.map(d => `<tr><td>${fmt(d)}</td><td>${fmt(mine - d * r / 12, 1)}</td><td>${fmt(pred - d * r / 12, 1)}</td></tr>`).join('');
+  const nm = encodeURIComponent(META.name[i] || dong);
+  $('mapLink').innerHTML = `<a href="https://map.kakao.com/link/map/${nm},${B.lat[i].toFixed(6)},${B.lon[i].toFixed(6)}" target="_blank" rel="noopener">카카오맵에서 위치 보기</a>`;
+
+  // 같은 건물 실거래
+  const ks = tradesOf(i), near = ks.filter(k => Math.abs(T.area[k] - area) <= 5);
+  const rows = (near.length ? near : ks).sort((a, b) => T.month[b] - T.month[a]).slice(0, 30);
+  $('tradeText').textContent = `전체 ${ks.length}건 중 면적 ±5㎡ 거래 ${near.length}건` + (near.length ? '' : ' (없어서 전체 표시)');
+  $('trades').innerHTML = '<tr><th>계약</th><th>전용면적(㎡)</th><th>층</th><th>보증금(만원)</th><th>월세(만원)</th><th>계약개월수</th><th>월부담액</th></tr>' +
+    rows.map(k => `<tr><td>2024-${String(T.month[k]).padStart(2, '0')}</td><td>${T.area[k].toFixed(2)}</td><td>${T.floor[k]}</td><td>${fmt(T.dep[k])}</td><td>${fmt(T.rent[k])}</td><td>${T.months[k]}</td><td>${fmt(T.dep[k] * r / 12 + T.rent[k], 1)}</td></tr>`).join('');
+
+  $('howto').innerHTML = [
+    `<b>월부담액</b> = 보증금 × 전환율 ÷ 12 + 월세. 전환율은 같은 건물, 같은 면적, 같은 달 계약끼리 비교해서 찾은 값 (아파트 ${(META.rate['아파트'] * 100).toFixed(2)}%, 연립다세대 ${(META.rate['연립다세대'] * 100).toFixed(2)}%)`,
+    '<b>모델 적정가</b> : XGBoost가 집 조건(면적, 층, 건축년도), 계약 조건, 위치, 동네 인구, 주변 시설로 예측한 월부담액',
+    `<b>적정 범위</b> : 2024년에 거래가 있던 건물의 새 계약을 모델이 맞혔을 때 오차 분포로 잡은 80% 범위. 같은 건물 거래가 적을수록 넓어짐 (이 건물은 ${ntx}건)`,
+    '<b>SHAP</b> : 모델 예측을 요인별 금액으로 나눈 값. 다 더하면 모델 적정가가 됨',
+    '2024년 거래 기준이라 이후 시세 변화는 반영 안 됨',
+  ].map(s => `<li>${s}</li>`).join('');
+}
+function niceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(raw))), n = raw / p;
+  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * p;
+}
+init().catch(e => { $('loading').textContent = '불러오기 실패: 최신 크롬, 엣지, 사파리, 파이어폭스로 열어주세요 (' + e + ')'; });
+</script>
+</body>
+</html>
