@@ -1,3 +1,6 @@
+> 이 레포는 2025-1 데이터마이닝 3조 팀 프로젝트([dongwon0002/DataMining_term](https://github.com/dongwon0002/DataMining_term))를 fork한 것입니다.
+> 원본 결과는 아래에 그대로 두었고, 이후 개인 확장 작업은 `v2/`에 정리합니다.
+
 ## 서울시 월세예측&결정요인 분석
 ![image](https://github.com/user-attachments/assets/0126b02e-6635-4df4-a5cc-69273b7ac8c6)
 
